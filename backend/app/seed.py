@@ -1,7 +1,60 @@
 """示例数据：每个模块给几条不同状态的记录，方便起服务后立刻看到内容。"""
 from __future__ import annotations
 
+from datetime import date, timedelta
 from typing import Any
+
+from app.regions import region_name_on
+
+
+def _waterhazard_rows() -> list[dict[str, Any]]:
+    """水文监测样例：跨区域、跨日期、涌水量各异，另留三条缺区域名的存量记录用于回填。"""
+    areas = ["东翼", "西翼", "南翼", "北翼"]
+    quality = ["弱酸性", "中性", "弱碱性"]
+    statuses = ["正常", "涌水增加", "突水危险", "已控制"]
+    rows: list[dict[str, Any]] = []
+    base = date(2026, 7, 20)
+    for i in range(1, 49):
+        day = base + timedelta(days=((i - 1) * 75) // 47)
+        area = areas[i % 4]
+        status = statuses[i % 4]
+        rows.append({
+            "id": i,
+            "status": status,
+            "pending": status != "已控制",
+            "abnormal": status in ("涌水增加", "突水危险"),
+            "监测编号": f"WATE-{i:04d}",
+            "所属片区": area,
+            "所在区域": region_name_on(area, day) or "",
+            "监测日期": day.isoformat(),
+            "涌水量": round(18 + (i * 37) % 285 + (i % 5) * 0.7, 1),
+            "水压": f"{0.4 + (i % 9) * 0.12:.2f}",
+            "水温": f"{12 + i % 8}",
+            "水质类型": quality[i % 3],
+            "排水能力": 200 + (i % 6) * 50,
+            "水害状态": status,
+        })
+    # 存量老记录：登记时没填区域名，靠启动时的回填按当时的区域划分补上
+    for j, (area, day) in enumerate([("东翼", "2026-08-10"), ("东翼", "2026-09-15"), ("西翼", "2026-09-20")], start=1):
+        i = 48 + j
+        rows.append({
+            "id": i,
+            "status": "正常",
+            "pending": True,
+            "abnormal": False,
+            "监测编号": f"WATE-{i:04d}",
+            "所属片区": area,
+            "所在区域": "",
+            "监测日期": day,
+            "涌水量": round(60 + j * 25.5, 1),
+            "水压": "0.50",
+            "水温": "14",
+            "水质类型": quality[j % 3],
+            "排水能力": 250,
+            "水害状态": "正常",
+        })
+    return rows
+
 
 SEED_ROWS: dict[str, list[dict[str, Any]]] = {
     "minearea": [{'id': 1,
@@ -148,42 +201,7 @@ SEED_ROWS: dict[str, list[dict[str, Any]]] = {
   '监测日期': '2026-09-03',
   '监测人员': '顶板管理样例3',
   '顶板状态': '顶板管理样例3'}],
-    "waterhazard": [{'id': 1,
-  'status': '正常',
-  'pending': True,
-  'abnormal': False,
-  '监测编号': 'WATE-0001',
-  '所在区域': '水害防治样例1',
-  '涌水量': '水害防治样例1',
-  '水压': '水害防治样例1',
-  '水温': '水害防治样例1',
-  '水质类型': '水害防治样例1',
-  '排水能力': '水害防治样例1',
-  '水害状态': '水害防治样例1'},
- {'id': 2,
-  'status': '涌水增加',
-  'pending': True,
-  'abnormal': True,
-  '监测编号': 'WATE-0002',
-  '所在区域': '水害防治样例2',
-  '涌水量': '水害防治样例2',
-  '水压': '水害防治样例2',
-  '水温': '水害防治样例2',
-  '水质类型': '水害防治样例2',
-  '排水能力': '水害防治样例2',
-  '水害状态': '水害防治样例2'},
- {'id': 3,
-  'status': '突水危险',
-  'pending': False,
-  'abnormal': False,
-  '监测编号': 'WATE-0003',
-  '所在区域': '水害防治样例3',
-  '涌水量': '水害防治样例3',
-  '水压': '水害防治样例3',
-  '水温': '水害防治样例3',
-  '水质类型': '水害防治样例3',
-  '排水能力': '水害防治样例3',
-  '水害状态': '水害防治样例3'}],
+    "waterhazard": _waterhazard_rows(),
     "rockburst": [{'id': 1,
   'status': '正常',
   'pending': True,

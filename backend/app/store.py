@@ -6,6 +6,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from app.regions import backfill_region_names
 from app.seed import SEED_ROWS
 
 
@@ -14,6 +15,8 @@ class Store:
         self._tables: dict[str, list[dict[str, Any]]] = {
             name: [dict(row) for row in rows] for name, rows in SEED_ROWS.items()
         }
+        # 存量水文监测按当时的区域划分回填区域名（只补空缺，不改已有命名）
+        backfill_region_names(self._tables.setdefault("waterhazard", []))
 
     def module_names(self) -> list[str]:
         return sorted(self._tables)
