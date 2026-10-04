@@ -13,6 +13,10 @@ class PageResult(BaseModel, Generic[T]):
     total: int
     page: int = 1
     size: int = 20
+    # 筛选口径有问题（如区间写反）时给前端的可读说明；此时 items/total 必为空。
+    warning: str | None = None
+    # 基于筛选后全量命中行（分页前）的汇总，供统计卡片/日报使用。
+    summary: dict[str, Any] | None = None
 
 
 class ActionResult(BaseModel):

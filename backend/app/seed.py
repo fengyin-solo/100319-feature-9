@@ -1,7 +1,73 @@
 """示例数据：每个模块给几条不同状态的记录，方便起服务后立刻看到内容。"""
 from __future__ import annotations
 
+from datetime import date, timedelta
 from typing import Any
+
+
+def _round1(value: float) -> float:
+    """涌水量等测量值保留一位小数；恰好为整数时不带小数点。"""
+    rounded = round(value, 1)
+    return int(rounded) if float(rounded).is_integer() else rounded
+
+
+def _water_status(flow: float) -> str:
+    """按涌水量划分水害状态：>=120 突水危险，>=60 涌水增加，其余正常。"""
+    if flow >= 120:
+        return "突水危险"
+    if flow >= 60:
+        return "涌水增加"
+    return "正常"
+
+
+def _waterhazard_seed_rows() -> list[dict[str, Any]]:
+    """生成跨月份、跨区域的水文监测记录。
+
+    「北翼采区」在 2026-05-01 更名为「北翼综采工作面」：存量记录保留当时的
+    区域命名（旧名），新记录按新区域划分回填，筛选口径见 services/waterhazard.py。
+    """
+    regions = [
+        {"current": "南翼回风斜井", "base": 12.0, "step": 3.2},
+        {"current": "北翼综采工作面", "base": 18.0, "step": 4.5},
+        {"current": "中央水仓", "base": 35.0, "step": 7.0},
+        {"current": "东翼轨道大巷", "base": 8.0, "step": 2.4},
+        {"current": "西翼皮带巷", "base": 24.0, "step": 5.1},
+    ]
+    water_types = ["砂岩裂隙水", "灰岩岩溶水", "老空水", "孔隙潜水"]
+    start_day = date(2026, 1, 5)
+    rows: list[dict[str, Any]] = []
+    next_id = 1
+    for region_index, region in enumerate(regions):
+        for index in range(14):
+            day = start_day + timedelta(days=region_index * 3 + index * 19)
+            # 同一区域随月份缓慢抬升，叠加区域相位差，制造高低不同的涌水量。
+            flow = region["base"] + region["step"] * index + (region_index * 7) % 11
+            flow = _round1(flow)
+            region_name = region["current"]
+            if region_name == "北翼综采工作面" and day < date(2026, 5, 1):
+                region_name = "北翼采区"  # 存量数据按当时的区域划分保留旧名
+            status = _water_status(float(flow))
+            pressure = _round1(0.8 + index * 0.07 + region_index * 0.13)
+            temperature = _round1(16.0 + (index % 5) * 0.8 + region_index * 0.4)
+            drainage = _round1(max(40.0, float(flow) * 1.6 + 30))
+            rows.append({
+                "id": next_id,
+                "status": status,
+                "pending": status != "已控制",
+                "abnormal": status == "突水危险",
+                "监测编号": f"WATE-{next_id:04d}",
+                "所在区域": region_name,
+                "涌水量": flow,
+                "水压": pressure,
+                "水温": temperature,
+                "水质类型": water_types[(next_id - 1) % len(water_types)],
+                "排水能力": drainage,
+                "监测日期": day.isoformat(),
+                "水害状态": status,
+            })
+            next_id += 1
+    return rows
+
 
 SEED_ROWS: dict[str, list[dict[str, Any]]] = {
     "minearea": [{'id': 1,
@@ -148,42 +214,7 @@ SEED_ROWS: dict[str, list[dict[str, Any]]] = {
   '监测日期': '2026-09-03',
   '监测人员': '顶板管理样例3',
   '顶板状态': '顶板管理样例3'}],
-    "waterhazard": [{'id': 1,
-  'status': '正常',
-  'pending': True,
-  'abnormal': False,
-  '监测编号': 'WATE-0001',
-  '所在区域': '水害防治样例1',
-  '涌水量': '水害防治样例1',
-  '水压': '水害防治样例1',
-  '水温': '水害防治样例1',
-  '水质类型': '水害防治样例1',
-  '排水能力': '水害防治样例1',
-  '水害状态': '水害防治样例1'},
- {'id': 2,
-  'status': '涌水增加',
-  'pending': True,
-  'abnormal': True,
-  '监测编号': 'WATE-0002',
-  '所在区域': '水害防治样例2',
-  '涌水量': '水害防治样例2',
-  '水压': '水害防治样例2',
-  '水温': '水害防治样例2',
-  '水质类型': '水害防治样例2',
-  '排水能力': '水害防治样例2',
-  '水害状态': '水害防治样例2'},
- {'id': 3,
-  'status': '突水危险',
-  'pending': False,
-  'abnormal': False,
-  '监测编号': 'WATE-0003',
-  '所在区域': '水害防治样例3',
-  '涌水量': '水害防治样例3',
-  '水压': '水害防治样例3',
-  '水温': '水害防治样例3',
-  '水质类型': '水害防治样例3',
-  '排水能力': '水害防治样例3',
-  '水害状态': '水害防治样例3'}],
+    "waterhazard": _waterhazard_seed_rows(),
     "rockburst": [{'id': 1,
   'status': '正常',
   'pending': True,
